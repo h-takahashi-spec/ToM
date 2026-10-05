@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>おやつパズル集計</title>
+<style>
+  :root{--bg:#faf7f2;--ink:#2b2622;--sub:#7a6f66;--line:#e6ded4;--bar:#c9bfb3;--hit:#d9653b}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:"Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif}
+  main{max-width:900px;margin:0 auto;padding:28px 16px}
+  h1{font-size:1.6rem;margin:0 0 4px}
+  .sub{color:var(--sub)}
+  .stats{display:flex;flex-wrap:wrap;gap:12px;margin:22px 0}
+  .stat{flex:1;min-width:150px;background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px 16px}
+  .stat b{display:block;font-size:2rem}
+  .row{display:flex;align-items:center;gap:10px;margin:7px 0}
+  .lab{width:9.5em;text-align:right;font-size:.95rem}
+  .track{flex:1;background:#fff;border:1px solid var(--line);border-radius:8px;height:28px;overflow:hidden}
+  .fill{height:100%;background:var(--bar)}
+  .fill.hit{background:var(--hit)}
+  .num{width:3em;font-variant-numeric:tabular-nums}
+  button{font:inherit;padding:8px 18px;border-radius:999px;border:1px solid var(--line);background:#fff;cursor:pointer}
+</style>
+</head>
+<body>
+<main>
+  <h1>先生のおやつはどれ？ 集計</h1>
+  <div class="sub" id="meta">読み込み中…</div>
+  <div class="stats" id="stats"></div>
+  <h2>Q1 の回答分布</h2>
+  <div id="bars"></div>
+  <p><button id="reload">更新</button></p>
+</main>
+<script>
+// index.html と同じ Apps Script のURL
+const ENDPOINT = "https://script.google.com/macros/s/AKfycbz_hYTrPGcg_WnP7xZxrW5tgE-xDuuQt5jqy0bI5RX904NYS0bY2nl29D06o0njiwIs/exec";
+// 正解は公開リポジトリに書かず、URL で渡す：results.html?ans=（種類）・（味）
+// 付けずに開くと、正答率も正解の強調も出ない（解説前に映す用）
+const ANSWER = new URLSearchParams(location.search).get("ans");
+const REVEAL = !!ANSWER;
+
+const ITEMS = ["アイス・ソーダ","アイス・レモン","クッキー・レモン","クッキー・抹茶","クッキー・メロン",
+  "グミ・いちご","グミ・キャラメル","チョコ・ソーダ","チョコ・抹茶","チョコ・キャラメル"];
+const pct = x => Math.round(x*100) + "%";
+
+async function load(){
+  const r = await fetch(ENDPOINT); const d = await r.json();
+  document.getElementById("meta").textContent = `回答者 ${d.n} 人（${new Date().toLocaleTimeString()} 時点）`;
+  const stats = [["平均の自信（1〜5）", d.mean_confidence.toFixed(1)]];
+  if (REVEAL) stats.unshift(
+    ["Q1 正答率", pct(d.correct_rate)],
+    ["Q3 ミナト1回目後の候補を正しく絞れた", pct(d.step1_rate)],
+    ["Q4 ハル発言後の候補を正しく絞れた", pct(d.step2_rate)]);
+  document.getElementById("stats").innerHTML =
+    stats.map(([k,v])=>`<div class="stat">${k}<b>${v}</b></div>`).join("");
+  const max = Math.max(1, ...Object.values(d.answers));
+  document.getElementById("bars").innerHTML = ITEMS.map(k=>{
+    const n = d.answers[k] || 0;
+    return `<div class="row"><div class="lab">${k.replace("・","　")}</div>
+      <div class="track"><div class="fill ${REVEAL && k===ANSWER ? "hit":""}" style="width:${n/max*100}%"></div></div>
+      <div class="num">${n}</div></div>`;
+  }).join("");
+}
+document.getElementById("reload").onclick = load;
+load().catch(()=>document.getElementById("meta").textContent="読み込みに失敗しました（ENDPOINT を確認）");
+</script>
+</body>
+</html>
